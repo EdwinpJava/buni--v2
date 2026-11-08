@@ -1,20 +1,15 @@
-# API BUNI (Express + Socket.IO)
-FROM node:22-slim
+FROM python:3.10-slim
 
 WORKDIR /app
-ENV NODE_ENV=production
 
-# Dependencias de produccion
-COPY package*.json ./
-RUN npm install --omit=dev --no-audit --no-fund && npm cache clean --force
+# Copiar e instalar dependencias
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Codigo fuente
-COPY src ./src
+# Copiar el resto del código del proyecto
+COPY . .
 
-# Carpeta de archivos subidos (multer usa ./uploads)
-RUN mkdir -p uploads && chown -R node:node /app
-USER node
+EXPOSE 5000
 
-EXPOSE 4000
-
-CMD ["node", "src/index.js"]
+# Comando para iniciar la aplicación Flask con Gunicorn
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000"]
