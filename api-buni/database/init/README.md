@@ -3,14 +3,16 @@
 MySQL ejecuta los archivos `.sql` de esta carpeta, en orden alfabetico,
 **solo la primera vez** que arranca (cuando el volumen `mysql_data` esta vacio).
 
-Coloca aqui el esquema de la base de datos, por ejemplo `01-schema.sql`:
+`01-buni.sql` contiene el esquema y los datos iniciales de BUNI. El volcado se
+limpio para incluir solo la base `buni`; no importes el esquema del sistema
+MySQL (`sys`). El servicio `db` del `docker-compose.yml` monta esta carpeta y
+crea la base indicada por `DB_NAME` (por defecto, `buni`).
 
-- Exporta solo la estructura (sin datos): en MySQL Workbench,
-  *Data Export > Dump Structure Only*, o
-  `mysqldump --no-data -u root -p buni > 01-schema.sql`.
-- Quita las lineas `CREATE DATABASE` y `USE ...` del dump: los scripts ya se
-  ejecutan sobre la base definida en `DB_NAME`.
-- No subas dumps con datos reales de usuarios al repositorio.
+No agregues aqui volcados con datos reales o secretos. Si reemplazas el SQL,
+asegurate de exportar la base `buni` y omitir `CREATE DATABASE` y `USE`, ya que
+MySQL ejecuta los scripts dentro de la base configurada por `DB_NAME`.
 
-Si la base ya fue creada, estos archivos se ignoran. Para reiniciarla hay que
-borrar el volumen `mysql_data` en Dokploy (se pierden los datos).
+Si el volumen `mysql_data` ya tiene una base, estos archivos se ignoran. Para
+cargar este esquema en un volumen existente, haz primero una copia de seguridad
+y sigue un procedimiento de migracion; no borres el volumen sin confirmar que
+puedes perder sus datos.
