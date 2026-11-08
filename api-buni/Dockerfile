@@ -1,15 +1,16 @@
-FROM python:3.10-slim
+FROM node:22-slim
 
 WORKDIR /app
+ENV NODE_ENV=production
 
-# Copiar todo el repositorio al contenedor
-COPY . .
+COPY package*.json ./
+RUN npm install --omit=dev --no-audit --no-fund && npm cache clean --force
 
-# Buscar e instalar requirements.txt (sea en la raíz o dentro de buniv2)
-RUN if [ -f "requirements.txt" ]; then pip install --no-cache-dir -r requirements.txt; \
-    elif [ -f "buniv2/requirements.txt" ]; then pip install --no-cache-dir -r buniv2/requirements.txt; fi
+COPY src ./src
 
-EXPOSE 5000
+RUN mkdir -p uploads && chown -R node:node /app
+USER node
 
-# Iniciar la aplicación Gunicorn (detectando si app.py está en la raíz o en buniv2)
-CMD ["sh", "-c", "if [ -f app.py ]; then gunicorn app:app --bind 0.0.0.0:5000; else cd buniv2 && gunicorn app:app --bind 0.0.0.0:5000; fi"]
+EXPOSE 4000
+
+CMD ["node", "src/index.js"]
