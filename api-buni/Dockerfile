@@ -1,23 +1,20 @@
-# Imagen base de Node.js
-FROM node:18-alpine
+# API BUNI (Express + Socket.IO)
+FROM node:22-slim
 
-# Directorio de trabajo
 WORKDIR /app
+ENV NODE_ENV=production
 
-# Copiar archivos de dependencias
+# Dependencias de produccion
 COPY package*.json ./
+RUN npm install --omit=dev --no-audit --no-fund && npm cache clean --force
 
-# Instalar dependencias
-RUN npm install
+# Codigo fuente
+COPY src ./src
 
-# Copiar el resto del código
-COPY . .
+# Carpeta de archivos subidos (multer usa ./uploads)
+RUN mkdir -p uploads && chown -R node:node /app
+USER node
 
-# Compilar TypeScript si el proyecto lo requiere
-RUN npm run build --if-present
+EXPOSE 4000
 
-# Exponer el puerto
-EXPOSE 3000
-
-# Comando de arranque
-CMD ["npm", "start"]
+CMD ["node", "src/index.js"]

@@ -1,43 +1,80 @@
-version: '3.8'
+# BUNI V2 - stack completo para Dokploy (tipo "Docker Compose")
+#
+# Servicios:
+#   db  -> MySQL 8 (solo red interna, sin dominio)
+#   api -> Express + Socket.IO, puerto 4000  (dominio: api.tu-dominio)
+#   web -> Next.js, puerto 3000             (dominio: tu-dominio)
+#
+# Las variables se definen en Dokploy > Environment (ver .env.example).
+# Los dominios se agregan en Dokploy > Domains; Dokploy conecta el servicio
+# a Traefik. No usar container_name ni ports: Dokploy los maneja.
 
 services:
-  # Base de datos MySQL
   db:
     image: mysql:8.0
-    container_name: buni-mysql
-    restart: always
+    restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${DB_NAME}
-      MYSQL_USER: ${DB_USER}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Falta DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME:-buni}
+      MYSQL_USER: ${DB_USER:-buni}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD}
     volumes:
       - mysql_data:/var/lib/mysql
-    networks:
-      - buni-network
+      # Los .sql de esta carpeta se ejecutan solo la primera vez (volumen vacio)
+      - ./api-buni/database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
-  # Servidor Backend / App
-  backend:
+  api:
     build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: buni-backend
-    restart: always
+      context: ./api-buni
+    restart: unless-stopped
     environment:
-      PORT: 3000
+      PORT: 4000
       DB_HOST: db
-      DB_USER: ${DB_USER}
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-buni}
+      DB_USER: ${DB_USER:-buni}
       DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-      JWT_SECRET: ${JWT_SECRET}
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET}
+      CORS_ORIGINS: ${CORS_ORIGINS:?Falta CORS_ORIGINS}
+      FRONTEND_URL: ${FRONTEND_URL:?Falta FRONTEND_URL}
+      ADMIN_NAME: ${ADMIN_NAME:-Administrador}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_ROLE: ${ADMIN_ROLE:-Administrador}
+      RATE_LIMIT_WINDOW_MINUTES: ${RATE_LIMIT_WINDOW_MINUTES:-15}
+      # Detras de Traefik todas las peticiones llegan con la misma IP,
+      # asi que este limite es compartido por todos los usuarios.
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-10000}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+    volumes:
+      - api_uploads:/app/uploads
+    expose:
+      - "4000"
     depends_on:
-      - db
-    networks:
-      - buni-network
+      db:
+        condition: service_healthy
 
-networks:
-  buni-network:
-    driver: bridge
+  web:
+    build:
+      context: ./Buni
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?Falta NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_WEBSOCKET_URL: ${NEXT_PUBLIC_WEBSOCKET_URL:?Falta NEXT_PUBLIC_WEBSOCKET_URL}
+    restart: unless-stopped
+    expose:
+      - "3000"
+    depends_on:
+      - api
 
 volumes:
   mysql_data:
+  api_uploads:
